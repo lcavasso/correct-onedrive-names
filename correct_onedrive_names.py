@@ -15,10 +15,7 @@ def generate_valid_name(original_path:str, rename_tilde_dollarsign=False):
         replaces any characters that OneDrive doesn't accept with an underscore
     '''
     # see https://support.microsoft.com/en-us/office/restrictions-and-limitations-in-onedrive-and-sharepoint-64883a5d-228e-48f5-b3d2-eb39e07630fa#invalidcharacters
-    forbidden_substrings = ('"', '*', ':', '<', '>', '?', '/', '\\', '|', '_vti_',
-                            # extra characters for testing only:
-                            #'[',']',
-                            )
+    forbidden_substrings = ('"', '*', ':', '<', '>', '?', '/', '\\', '|', '_vti_')
     # see https://support.microsoft.com/en-us/office/restrictions-and-limitations-in-onedrive-and-sharepoint-64883a5d-228e-48f5-b3d2-eb39e07630fa#invalidfilefoldernames
     forbidden_names = ('.lock', 'CON', 'PRN', 'AUX', 'NUL',
                        'COM0', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
