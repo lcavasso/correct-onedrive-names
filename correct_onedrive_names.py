@@ -3,7 +3,14 @@ import warnings     # to warn about un-renamed files (rare)
 import csv          # to log changes
 import datetime     # to name the log file
 import re           # to make duplicate file name resolution easier
+import sys			# for command line arguments
 
+if '-verbose' in sys.argv:
+	verbosity = True
+else:
+	verbosity = False
+
+# get path to onedrive
 path_to_onedrive = input('What folder should I check? ')
 
 # function to correct file or folder names
@@ -15,7 +22,10 @@ def generate_valid_name(original_path:str, rename_tilde_dollarsign=False):
         replaces any characters that OneDrive doesn't accept with an underscore
     '''
     # see https://support.microsoft.com/en-us/office/restrictions-and-limitations-in-onedrive-and-sharepoint-64883a5d-228e-48f5-b3d2-eb39e07630fa#invalidcharacters
-    forbidden_substrings = ('"', '*', ':', '<', '>', '?', '/', '\\', '|', '_vti_')
+    forbidden_substrings = ('"', '*', ':', '<', '>', '?', '/', '\\', '|', '_vti_',
+                            # extra characters for testing only:
+                            #'[',']',
+                            )
     # see https://support.microsoft.com/en-us/office/restrictions-and-limitations-in-onedrive-and-sharepoint-64883a5d-228e-48f5-b3d2-eb39e07630fa#invalidfilefoldernames
     forbidden_names = ('.lock', 'CON', 'PRN', 'AUX', 'NUL',
                        'COM0', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
@@ -103,16 +113,19 @@ def write_to_log(old_path, new_path, override_datetime=False, log_path = log_fil
         else:
             logwriter.writerow(row_to_write)
         
-
 # write headers to log
 write_to_log('old_path', 'new_path', override_datetime='datetime')
 
 # start by renaming any bad folders
-# following function taken from https://stackoverflow.com/questions/973473/getting-a-list-of-all-subdirectories-in-the-current-directory
-def fast_scandir(dirname):
-    subfolders= [f.path for f in os.scandir(dirname) if f.is_dir()]
+# following function copied from https://stackoverflow.com/questions/973473/getting-a-list-of-all-subdirectories-in-the-current-directory
+def fast_scandir(dirname, is_root=True):
+    # for Macs, scip scanning any hidden folders in root
+    if is_root and os.name == 'posix':
+        subfolders= [f.path for f in os.scandir(dirname) if f.is_dir() and f.name[0] != '.']
+    else:
+        subfolders= [f.path for f in os.scandir(dirname) if f.is_dir()]
     for dirname in list(subfolders):
-        subfolders.extend(fast_scandir(dirname))
+        subfolders.extend(fast_scandir(dirname, is_root=False))
     return subfolders
 
 # get folder names
@@ -125,19 +138,27 @@ for folder in onedrive_folders:
     newname = generate_valid_name(folder)
     if newname != folder:
         # do the rename
-        rename_fixing_dupes(folder, newname, verbose=False)
+        rename_fixing_dupes(folder, newname, verbose=verbosity)
         # record the name change
         write_to_log(folder, newname)
 
 # get filenames
 print('Finding files')
-onedrive_files = [os.path.join(dir, file) for dir, subdirs, files in os.walk(path_to_onedrive) for file in files]
+# for Macs, exclude hidden folders/files in root directory
+if os.name == 'posix':
+    subfolders = [f.path for f in os.scandir(path_to_onedrive) if f.is_dir() and f.name[0] != '.' and f.name != 'Icon']
+    # this could be a single list comprehension but writing it differently due to number of for loops needed
+    onedrive_files = []
+    for folder in subfolders:
+        onedrive_files.extend([os.path.join(dir, file) for dir, subdirs, files in os.walk(folder) for file in files])
+else:
+    onedrive_files = [os.path.join(dir, file) for dir, subdirs, files in os.walk(path_to_onedrive) for file in files]
 print('Renaming files')
 for orig_file in onedrive_files:
     # get the new name
     newname = generate_valid_name(orig_file)
     if newname != orig_file:
         # rename
-        rename_fixing_dupes(orig_file, newname, verbose=False)
+        rename_fixing_dupes(orig_file, newname, verbose=verbosity)
         # log
         write_to_log(orig_file, newname)
