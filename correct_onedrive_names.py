@@ -119,7 +119,7 @@ write_to_log('old_path', 'new_path', override_datetime='datetime')
 # start by renaming any bad folders
 # following function copied from https://stackoverflow.com/questions/973473/getting-a-list-of-all-subdirectories-in-the-current-directory
 def fast_scandir(dirname, is_root=True):
-    # for Macs, scip scanning any hidden folders in root
+    # for Macs, skip scanning any hidden folders in root
     if is_root and os.name == 'posix':
         subfolders= [f.path for f in os.scandir(dirname) if f.is_dir() and f.name[0] != '.']
     else:
