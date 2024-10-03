@@ -3,7 +3,7 @@ import warnings     # to warn about un-renamed files (rare)
 import csv          # to log changes
 import datetime     # to name the log file
 import re           # to make duplicate file name resolution easier
-import sys			# for command line arguments
+import sys          # for command line arguments
 
 if '-verbose' in sys.argv:
 	verbosity = True
