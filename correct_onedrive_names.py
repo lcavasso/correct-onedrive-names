@@ -117,7 +117,7 @@ def write_to_log(old_path, new_path, override_datetime=False, log_path = log_fil
 write_to_log('old_path', 'new_path', override_datetime='datetime')
 
 # start by renaming any bad folders
-# following function copied from https://stackoverflow.com/questions/973473/getting-a-list-of-all-subdirectories-in-the-current-directory
+# following function modified from https://stackoverflow.com/questions/973473/getting-a-list-of-all-subdirectories-in-the-current-directory
 def fast_scandir(dirname, is_root=True):
     # for Macs, skip scanning any hidden folders in root
     if is_root and os.name == 'posix':
