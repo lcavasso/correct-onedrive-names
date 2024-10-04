@@ -3,12 +3,14 @@ import warnings     # to warn about un-renamed files (rare)
 import csv          # to log changes
 import datetime     # to name the log file
 import re           # to make duplicate file name resolution easier
-import sys          # for command line arguments
+import sys			# for command line arguments
 
 if '-verbose' in sys.argv:
 	verbosity = True
 else:
 	verbosity = False
+
+while_limit = sys.getrecursionlimit()  # there is a while loop later. this caps it at a certain number
 
 # get path to onedrive
 path_to_onedrive = input('What folder should I check? ')
@@ -22,10 +24,7 @@ def generate_valid_name(original_path:str, rename_tilde_dollarsign=False):
         replaces any characters that OneDrive doesn't accept with an underscore
     '''
     # see https://support.microsoft.com/en-us/office/restrictions-and-limitations-in-onedrive-and-sharepoint-64883a5d-228e-48f5-b3d2-eb39e07630fa#invalidcharacters
-    forbidden_substrings = ('"', '*', ':', '<', '>', '?', '/', '\\', '|', '_vti_',
-                            # extra characters for testing only:
-                            #'[',']',
-                            )
+    forbidden_substrings = ('"', '*', ':', '<', '>', '?', '/', '\\', '|', '_vti_',)
     # see https://support.microsoft.com/en-us/office/restrictions-and-limitations-in-onedrive-and-sharepoint-64883a5d-228e-48f5-b3d2-eb39e07630fa#invalidfilefoldernames
     forbidden_names = ('.lock', 'CON', 'PRN', 'AUX', 'NUL',
                        'COM0', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
@@ -116,39 +115,44 @@ def write_to_log(old_path, new_path, override_datetime=False, log_path = log_fil
 # write headers to log
 write_to_log('old_path', 'new_path', override_datetime='datetime')
 
-# start by renaming any bad folders
-# following function modified from https://stackoverflow.com/questions/973473/getting-a-list-of-all-subdirectories-in-the-current-directory
-def fast_scandir(dirname, is_root=True):
-    # for Macs, skip scanning any hidden folders in root
-    if is_root and os.name == 'posix':
-        subfolders= [f.path for f in os.scandir(dirname) if f.is_dir() and f.name[0] != '.']
-    else:
-        subfolders= [f.path for f in os.scandir(dirname) if f.is_dir()]
-    for dirname in list(subfolders):
-        subfolders.extend(fast_scandir(dirname, is_root=False))
-    return subfolders
-
-# get folder names
-print('Finding subdirectories')
-onedrive_folders = fast_scandir(path_to_onedrive)
-# rename folders
-print('Renaming subdirectories')
-for folder in onedrive_folders:
-    # get the new name
-    newname = generate_valid_name(folder)
-    if newname != folder:
-        # do the rename
-        rename_fixing_dupes(folder, newname, verbose=verbosity)
-        # record the name change
-        write_to_log(folder, newname)
+# find folders in root
+if os.name == 'posix':
+    # for Mac, exclude hidden folders in root only; otherwise timeout errors can happen (and these files probably shouldn't be changed anyway)
+    unscanned_directories = [f.path for f in os.scandir(path_to_onedrive) if f.is_dir() and f.name[0] != '.']
+else:
+    unscanned_directories = [f.path for f in os.scandir(path_to_onedrive) if f.is_dir()]
+# rename them - this happens level by level for cases like 'upperfolder:/lowerfolder:'
+while_counter = 0
+while unscanned_directories and while_counter < while_limit:
+    while_counter += 1
+    for i in range(len(unscanned_directories)):
+        folder = unscanned_directories[i]
+        # get the new name
+        newname = generate_valid_name(folder)
+        if newname != folder:
+            # do the rename
+            rename_fixing_dupes(folder, newname, verbose=verbosity)
+            # record the name change
+            write_to_log(folder, newname)
+            # change it in the list
+            unscanned_directories[i] = newname
+    renamed_directories = unscanned_directories
+    unscanned_directories = []
+    # scan the next level
+    for folder in renamed_directories:
+        unscanned_directories.extend([f.path for f in os.scandir(folder) if f.is_dir()])
+if while_counter == while_limit:
+    warnings.warn('While loop reached limit of ' + str(while_limit) + ' loops. Some deep subdirectories may still have bad names.')
 
 # get filenames
 print('Finding files')
 # for Macs, exclude hidden folders/files in root directory
 if os.name == 'posix':
-    subfolders = [f.path for f in os.scandir(path_to_onedrive) if f.is_dir() and f.name[0] != '.' and f.name != 'Icon']
-    # this could be a single list comprehension but writing it differently due to number of for loops needed
-    onedrive_files = []
+    # get folders directly in root of OneDrive that are not hidden
+    subfolders = [f.path for f in os.scandir(path_to_onedrive) if f.is_dir() and f.name[0] != '.']
+    # get files in root of OneDrive that are not hidden or special
+    onedrive_files = [f.path for f in os.scandir(path_to_onedrive) if f.is_file() and f.name[0] != '.' and f.name != 'Icon']
+    # add files from non-hidden subfolders
     for folder in subfolders:
         onedrive_files.extend([os.path.join(dir, file) for dir, subdirs, files in os.walk(folder) for file in files])
 else:
